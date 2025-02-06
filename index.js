@@ -1,39 +1,45 @@
 const https = require("https");
-const url="https://time.com/";
+const { JSDOM } = require("jsdom"); 
 
-function fetchHTML(url,callback){
-    https.get(url,(res)=> {
-        let data= "";
+const url = "https://time.com/";
 
-        res.on("data",(chunk)=> {
-            data+=chunk;
+function fetchHTML(url, callback) {
+    https.get(url, (res) => {
+        let data = "";
+
+        res.on("data", (chunk) => {
+            data += chunk;
         });
 
-        res.on("end", ()=> {
-            callback(null,extractData(data));
+        res.on("end", () => {
+            callback(null, extractData(data));
         });
-    }).on("error",(err)=>{
-        callback(err,null);
+    }).on("error", (err) => {
+        callback(err, null);
     });
 }
 
-function extractData(data){
-    const articles =[];
+function extractData(data) {
+    const dom = new JSDOM(data);
+    const document = dom.window.document;
 
-    const articleMatches =[...data.matchAll(/<div class="latest-stories__item.*?href="(\/\d{4}\/\d{2}\/\d{2}\/.*?)".*?>(.*?)<\/div>/g)];
+    const articles = [];
+    const listItems = document.querySelectorAll(".latest-stories__item"); 
 
-    for(let match of articleMatches){
-        if(articles.length >=5){
-            break;
-        }
+    for (let li of listItems) {
+        const anchor = li.querySelector("a[href]"); 
+        const h3 = li.querySelector("h3"); 
 
-        const articleUrl = url+match[1];
-        const title = match[2].replace(/<.*?>/g, "").trim();
+        if (anchor && h3) {
+            const articleUrl = url + anchor.getAttribute("href"); 
+            const title = h3.textContent.trim();
 
-        if (title) {
             articles.push({ title, url: articleUrl });
+
+            if (articles.length >= 5) break; 
         }
     }
+
     return JSON.stringify({ latest_news: articles }, null, 2);
 }
 
